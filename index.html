@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Copiloto Tesla Vallès - BCN</title>
+<style>
+  body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background-color: #111827; color: white; display: flex; flex-direction: column; height: 100vh; text-align: center; overflow: hidden; }
+  #alerta-box { flex: 2; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; border-bottom: 3px solid #374151; transition: background-color 0.2s; }
+  .estado-normal { background-color: #064e3b; }
+  .estado-peligro { background-color: #dc2626; animation: parpadeo 0.8s infinite; }
+  @keyframes parpadeo { 50% { background-color: #7f1d1d; } }
+  h1 { font-size: 3.8rem; margin: 15px 0; letter-spacing: -1px; }
+  h2 { font-size: 1.8rem; margin: 5px 0; color: #e5e7eb; font-weight: 500; }
+  #trafico-box { flex: 1.2; padding: 20px 35px; overflow-y: auto; text-align: left; background-color: #1f2937; }
+  ul { font-size: 1.4rem; line-height: 1.6; padding-left: 20px; margin-top: 10px; }
+  li { margin-bottom: 8px; }
+  .gps-info { font-size: 1.1rem; color: #9ca3af; margin-top: 15px; background: rgba(0,0,0,0.3); padding: 8px 16px; border-radius: 20px; }
+  .header-trafico { display: flex; justify-content: space-between; align-items: center; }
+  #hora-act { font-size: 1rem; color: #9ca3af; }
+</style>
+</head>
+<body>
+
+<div id="alerta-box" class="estado-normal">
+  <h2 id="subtitulo">VÍA DESPEJADA DE RADARES</h2>
+  <h1 id="titulo-principal">CONDUCCIÓN NORMAL</h1>
+  <div class="gps-info" id="gps-status">Iniciando antena GPS del Tesla...</div>
+</div>
+
+<div id="trafico-box">
+  <div class="header-trafico">
+    <h2 style="margin:0; color:#60a5fa; font-weight: bold;">🚦 Incidencias en directo (Vallès / BCN)</h2>
+    <span id="hora-act">Cargando datos...</span>
+  </div>
+  <ul id="lista-incidencias">
+    <li>Conectando con el Servei Català de Trànsit...</li>
+  </ul>
+</div>
+
+<script>
+// 1. BASE DE DATOS DE RADARES FIJOS (Vallès Occidental, Oriental y Accesos BCN)
+const radares = [
+  { lat: 41.5161, lon: 2.1264, nombre: "C-58 Barberà / Badia", limite: "80 km/h" },
+  { lat: 41.5312, lon: 2.1128, nombre: "C-58 Tramo Sabadell - Badia", limite: "80 km/h" },
+  { lat: 41.4883, lon: 2.1524, nombre: "C-58 Ripollet / Montcada", limite: "80 km/h" },
+  { lat: 41.4645, lon: 2.1720, nombre: "C-58 Nudo Trinidad", limite: "80 km/h" },
+  { lat: 41.5542, lon: 2.0431, nombre: "C-58 Terrassa / Les Fonts", limite: "100 km/h" },
+  { lat: 41.5034, lon: 2.1189, nombre: "AP-7 Barberà del Vallès", limite: "100 km/h" },
+  { lat: 41.4821, lon: 2.0625, nombre: "AP-7 Sant Cugat", limite: "100 km/h" },
+  { lat: 41.5385, lon: 2.1794, nombre: "AP-7 Santa Perpètua", limite: "100 km/h" },
+  { lat: 41.5681, lon: 2.2452, nombre: "AP-7 Parets / Montmeló", limite: "100 km/h" },
+  { lat: 41.4395, lon: 2.0912, nombre: "C-16 Túneles Vallvidrera", limite: "80 km/h" },
+  { lat: 41.5186, lon: 2.2154, nombre: "C-17 Mollet / Parets", limite: "80 km/h" },
+  { lat: 41.4112, lon: 2.2185, nombre: "B-10 Ronda Litoral", limite: "80 km/h" },
+  { lat: 41.4351, lon: 2.1482, nombre: "B-20 Ronda de Dalt", limite: "80 km/h" }
+];
+
+// 2. CÁLCULO MATEMÁTICO DE DISTANCIA GPS (Haversine)
+function calcularDistancia(lat1, lon1, lat2, lon2) {
+  const R = 6371e3;
+  const p1 = lat1 * Math.PI/180;
+  const p2 = lat2 * Math.PI/180;
+  const dp = (lat2-lat1) * Math.PI/180;
+  const dl = (lon2-lon1) * Math.PI/180;
+  const a = Math.sin(dp/2)*Math.sin(dp/2) + Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)*Math.sin(dl/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// 3. LECTURA CONTINUA DEL GPS DEL TESLA
+if ("geolocation" in navigator) {
+  navigator.geolocation.watchPosition(function(pos) {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+    const vel = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
+    document.getElementById("gps-status").innerText = `GPS Activo | Velocidad: ${vel} km/h`;
+
+    let radarCercano = null;
+    let minDistancia = 99999;
+
+    radares.forEach(r => {
+      const dist = calcularDistancia(lat, lon, r.lat, r.lon);
+      if (dist < 800 && dist < minDistancia) { // Salta alerta a menos de 800 metros
+        minDistancia = Math.round(dist);
+        radarCercano = r;
+      }
+    });
+
+    const box = document.getElementById("alerta-box");
+    const titulo = document.getElementById("titulo-principal");
+    const sub = document.getElementById("subtitulo");
+
+    if (radarCercano) {
+      box.className = "estado-peligro";
+      sub.innerText = `⚠️ RADAR A ${minDistancia} METROS ⚠️`;
+      titulo.innerText = `${radarCercano.nombre} (${radarCercano.limite})`;
+    } else {
+      box.className = "estado-normal";
+      sub.innerText = "VÍA DESPEJADA DE RADARES";
+      titulo.innerText = "CONDUCCIÓN NORMAL";
+    }
+  }, function(err) {
+    document.getElementById("gps-status").innerText = "⚠️ Pulsa 'Permitir' arriba para activar el GPS del coche.";
+  }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
+}
+
+// 4. CONSULTA EN DIRECTO AL SERVEI CATALÀ DE TRÀNSIT (Sin recargar la página)
+async function actualizarTrafico() {
+  const lista = document.getElementById("lista-incidencias");
+  const vias = ['C-58', 'AP-7', 'C-16', 'B-10', 'B-20', 'C-17', 'B-30', 'N-150'];
+  
+  try {
+    const respuesta = await fetch("https://transparenciacatalunya.cat");
+    const datos = await respuesta.json();
+    
+    let html = "";
+    datos.forEach(inc => {
+      if (inc.via && vias.includes(inc.via.toUpperCase())) {
+        let tramo = inc.nom_tram || "Tramo general";
+        let causa = inc.causa || "Retención";
+        let sentido = inc.sentit ? `(Sentido ${inc.sentit})` : "";
+        html += `<li><strong>${inc.via}</strong> ${sentido} - ${tramo}: <span style="color:#fbbf24;">${causa}</span></li>`;
+      }
+    });
+
+    if (html === "") {
+      html = "<li style='color:#4ade80;'>✅ Todas las vías principales del Vallès y accesos a BCN están limpias.</li>";
+    }
+    
+    lista.innerHTML = html;
+    const ahora = new Date();
+    document.getElementById("hora-act").innerText = `Actualizado: ${ahora.getHours().toString().padStart(2,'0')}:${ahora.getMinutes().toString().padStart(2,'0')}`;
+  } catch (error) {
+    lista.innerHTML = "<li style='color:#f87171;'>Error de conexión con Trànsit. Reintentando en 1 minuto...</li>";
+  }
+}
+
+// Ejecutar al abrir y actualizar el tráfico cada 3 minutos en segundo plano
+actualizarTrafico();
+setInterval(actualizarTrafico, 180000);
+</script>
+</body>
+</html>
