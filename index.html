@@ -26,7 +26,11 @@
   #lista-incidencias { margin: 0; padding-left: 18px; font-size: 1rem; line-height: 1.35; }
   #lista-incidencias li { margin-bottom: 4px; }
 
+  /* Contenedor del Mapa */
   #map { flex: 1; width: 100%; height: 82vh; background-color: #1f2937; }
+  
+  /* Filtro CSS para convertir OpenStreetMap normal en Modo Oscuro estilo Tesla */
+  .mapa-oscuro { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
 </style>
 </head>
 <body>
@@ -35,7 +39,7 @@
   <div id="alerta-box" class="estado-normal">
     <div id="subtitulo">VÍA DESPEJADA DE RADARES</div>
     <div id="titulo-principal">CONDUCCIÓN NORMAL</div>
-    <div id="gps-status">Modo Vista Previa (Esperando GPS...)</div>
+    <div id="gps-status">Iniciando antena GPS...</div>
   </div>
 
   <div id="trafico-box">
@@ -44,7 +48,7 @@
       <span id="hora-act" style="color:#9ca3af; font-weight:normal;">Cargando...</span>
     </div>
     <ul id="lista-incidencias">
-      <li>Consultando Servei Català de Trànsit...</li>
+      <li>Conectando con Trànsit...</li>
     </ul>
   </div>
 </div>
@@ -52,6 +56,7 @@
 <div id="map"></div>
 
 <script>
+// 1. RADARES FIJOS VALLÈS - BARCELONA
 const radares = [
   { lat: 41.5161, lon: 2.1264, nombre: "C-58 Barberà / Badia", limite: "80 km/h" },
   { lat: 41.5312, lon: 2.1128, nombre: "C-58 Tramo Sabadell - Badia", limite: "80 km/h" },
@@ -68,20 +73,23 @@ const radares = [
   { lat: 41.4351, lon: 2.1482, nombre: "B-20 Ronda de Dalt", limite: "80 km/h" }
 ];
 
-// Iniciar mapa centrado en Barberà del Vallès
+// 2. INICIALIZAR MAPA OPENSTREETMAP (Infalible)
 const map = L.map('map').setView([41.5150, 2.1260], 13);
 
-L.tileLayer('https://{s}://{z}/{x}/{y}{r}.png', {
+L.tileLayer('https://openstreetmap.org{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  className: 'mapa-oscuro',
   attribution: '© OpenStreetMap'
 }).addTo(map);
 
 // Pintar los radares en rojo
 radares.forEach(r => {
   L.circleMarker([r.lat, r.lon], {
-    color: '#ef4444',
-    fillColor: '#dc2626',
-    fillOpacity: 0.9,
-    radius: 9
+    color: '#ffffff',
+    fillColor: '#ef4444',
+    fillOpacity: 1,
+    radius: 10,
+    weight: 2
   }).addTo(map).bindPopup(`<b>📸 Radar: ${r.nombre}</b><br>Límite: ${r.limite}`);
 });
 
@@ -90,10 +98,11 @@ let cocheMarker = L.circleMarker([41.5150, 2.1260], {
   color: '#ffffff',
   fillColor: '#3b82f6',
   fillOpacity: 1,
-  radius: 10,
+  radius: 11,
   weight: 3
 }).addTo(map);
 
+// 3. FÓRMULA DE DISTANCIA GPS
 function calcularDistancia(lat1, lon1, lat2, lon2) {
   const R = 6371e3;
   const p1 = lat1 * Math.PI/180;
@@ -105,6 +114,7 @@ function calcularDistancia(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+// 4. LECTURA CONTINUA DEL GPS
 if ("geolocation" in navigator) {
   navigator.geolocation.watchPosition(function(pos) {
     const lat = pos.coords.latitude;
@@ -140,10 +150,11 @@ if ("geolocation" in navigator) {
       titulo.innerText = "CONDUCCIÓN NORMAL";
     }
   }, function(err) {
-    document.getElementById("gps-status").innerText = "Vista Previa PC (Esperando GPS de coche)";
+    document.getElementById("gps-status").innerText = "Vista Previa PC (Esperando GPS en coche)";
   }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
 }
 
+// 5. INCIDENCIAS DEL SERVEI CATALÀ DE TRÀNSIT
 async function actualizarTrafico() {
   const lista = document.getElementById("lista-incidencias");
   const vias = ['C-58', 'AP-7', 'C-16', 'B-10', 'B-20', 'C-17', 'B-30', 'N-150'];
@@ -158,14 +169,14 @@ async function actualizarTrafico() {
     
     let html = "";
     for (let i = 0; i < incidencias.length; i++) {
-      let viaNode = incidencias[i].getElementsByTagName("carretera")[0];
-      let via = viaNode ? viaNode.textContent : "";
+      let viaList = incidencias[i].getElementsByTagName("carretera");
+      let via = viaList.length > 0 ? viaList[0].textContent : "";
       
       if (vias.some(v => via.toUpperCase().includes(v))) {
-        let causaNode = incidencias[i].getElementsByTagName("causa")[0];
-        let pobNode = incidencias[i].getElementsByTagName("poblacio")[0];
-        let causa = causaNode ? causaNode.textContent : "Retención";
-        let poblacio = pobNode ? pobNode.textContent : "";
+        let causaList = incidencias[i].getElementsByTagName("causa");
+        let pobList = incidencias[i].getElementsByTagName("poblacio");
+        let causa = causaList.length > 0 ? causaList[0].textContent : "Retención";
+        let poblacio = pobList.length > 0 ? pobList[0].textContent : "";
         html += `<li><strong>${via}</strong> (${poblacio}): <span style="color:#fbbf24;">${causa}</span></li>`;
       }
     }
