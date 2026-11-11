@@ -4,17 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Copiloto Tesla Vallès - BCN</title>
-<!-- Librería gratuita de Mapas Leaflet (Nunca bloquea conexión) -->
 <link rel="stylesheet" href="https://unpkg.com" />
 <script src="https://unpkg.com"></script>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background-color: #111827; color: white; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
   
-  /* Barra superior dividida en Radar (Izquierda) y Tráfico SCT (Derecha) */
   #top-bar { height: 18vh; min-height: 115px; display: flex; border-bottom: 3px solid #374151; z-index: 1000; }
   
-  /* Caja de Alerta de Radares */
   #alerta-box { flex: 1.2; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 10px 20px; text-align: center; transition: background-color 0.2s; border-right: 2px solid #374151; }
   .estado-normal { background-color: #064e3b; }
   .estado-peligro { background-color: #dc2626; animation: parpadeo 0.8s infinite; }
@@ -24,13 +21,11 @@
   #titulo-principal { font-size: 2rem; margin: 4px 0; font-weight: 800; line-height: 1.1; }
   #gps-status { font-size: 0.9rem; color: #d1d5db; background: rgba(0,0,0,0.35); padding: 3px 12px; border-radius: 12px; margin-top: 4px; }
 
-  /* Caja de Incidencias en directo (Derecha) */
   #trafico-box { flex: 1; background-color: #1f2937; padding: 10px 15px; overflow-y: auto; display: flex; flex-direction: column; justify-content: center; }
   .trafico-header { font-size: 0.95rem; color: #60a5fa; font-weight: bold; margin-bottom: 5px; display: flex; justify-content: space-between; }
   #lista-incidencias { margin: 0; padding-left: 18px; font-size: 1rem; line-height: 1.35; }
   #lista-incidencias li { margin-bottom: 4px; }
 
-  /* Mapa Interactivo a pantalla completa */
   #map { flex: 1; width: 100%; background-color: #1f2937; }
 </style>
 </head>
@@ -40,7 +35,7 @@
   <div id="alerta-box" class="estado-normal">
     <div id="subtitulo">VÍA DESPEJADA DE RADARES</div>
     <div id="titulo-principal">CONDUCCIÓN NORMAL</div>
-    <div id="gps-status">Iniciando GPS del Tesla...</div>
+    <div id="gps-status">Modo Vista Previa (Esperando GPS...)</div>
   </div>
 
   <div id="trafico-box">
@@ -49,12 +44,11 @@
       <span id="hora-act" style="color:#9ca3af; font-weight:normal;">Cargando...</span>
     </div>
     <ul id="lista-incidencias">
-      <li>Conectando con Trànsit...</li>
+      <li>Consultando Servei Català de Trànsit...</li>
     </ul>
   </div>
 </div>
 
-<!-- Contenedor del Mapa Libre -->
 <div id="map"></div>
 
 <script>
@@ -75,28 +69,30 @@ const radares = [
   { lat: 41.4351, lon: 2.1482, nombre: "B-20 Ronda de Dalt", limite: "80 km/h" }
 ];
 
-// 2. INICIALIZAR MAPA LIBRE (Modo Oscuro estilo Tesla)
+// 2. INICIALIZAR MAPA (Centrado por defecto en Barberà / C-58 para verlo en PC)
 const map = L.map('map').setView([41.5150, 2.1260], 13);
+
+// Mapa base oscuro estilo Tesla
 L.tileLayer('https://{s}://{z}/{x}/{y}{r}.png', {
   attribution: '© OpenStreetMap'
 }).addTo(map);
 
-// Pintar los radares en el mapa como círculos rojos
+// Pintar los radares en el mapa como círculos rojos con radio de aviso
 radares.forEach(r => {
   L.circleMarker([r.lat, r.lon], {
     color: '#ef4444',
     fillColor: '#dc2626',
-    fillOpacity: 0.8,
-    radius: 10
+    fillOpacity: 0.9,
+    radius: 9
   }).addTo(map).bindPopup(`<b>📸 Radar: ${r.nombre}</b><br>Límite: ${r.limite}`);
 });
 
-// Marcador azul para la posición en vivo de tu Tesla
+// Marcador azul para la posición del coche
 let cocheMarker = L.circleMarker([41.5150, 2.1260], {
   color: '#ffffff',
   fillColor: '#3b82f6',
   fillOpacity: 1,
-  radius: 11,
+  radius: 10,
   weight: 3
 }).addTo(map);
 
@@ -112,7 +108,7 @@ function calcularDistancia(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-// 4. LECTURA CONTINUA DEL GPS DEL TESLA
+// 4. LECTURA CONTINUA DEL GPS (Si estás en el coche, mueve el mapa; en PC no da error)
 if ("geolocation" in navigator) {
   navigator.geolocation.watchPosition(function(pos) {
     const lat = pos.coords.latitude;
@@ -120,7 +116,6 @@ if ("geolocation" in navigator) {
     const vel = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
     document.getElementById("gps-status").innerText = `GPS Activo | ${vel} km/h`;
 
-    // Mover el punto azul del Tesla en el mapa y centrar cámara
     cocheMarker.setLatLng([lat, lon]);
     map.panTo([lat, lon]);
 
@@ -149,16 +144,14 @@ if ("geolocation" in navigator) {
       titulo.innerText = "CONDUCCIÓN NORMAL";
     }
   }, function(err) {
-    document.getElementById("gps-status").innerText = "⚠️ Activa el permiso GPS arriba";
+    document.getElementById("gps-status").innerText = "PC sin GPS (Vista previa centrada en Vallès)";
   }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
 }
 
-// 5. INCIDENCIAS DEL SERVEI CATALÀ DE TRÀNSIT (Via Proxy CORS gratuito)
+// 5. INCIDENCIAS DEL SERVEI CATALÀ DE TRÀNSIT (Código corregido)
 async function actualizarTrafico() {
   const lista = document.getElementById("lista-incidencias");
   const vias = ['C-58', 'AP-7', 'C-16', 'B-10', 'B-20', 'C-17', 'B-30', 'N-150'];
-  
-  // Usamos allorigins como puente para evitar el bloqueo de seguridad del navegador
   const urlGencat = encodeURIComponent("https://gencat.cat");
   
   try {
@@ -170,10 +163,14 @@ async function actualizarTrafico() {
     
     let html = "";
     for (let i = 0; i < incidencias.length; i++) {
-      let via = incidencias[i].getElementsByTagName("carretera")[0]?.textContent || "";
+      let viaNode = incidencias[i].getElementsByTagName("carretera")[0];
+      let via = viaNode ? viaNode.textContent : "";
+      
       if (vias.some(v => via.toUpperCase().includes(v))) {
-        let causa = incidencias[i].getElementsByTagName("causa")[0]?.textContent || "Retención";
-        let poblacio = incidencias[i].getElementsByTagName("poblacio")[0]?.textContent || "";
+        let causaNode = incidencias[i].getElementsByTagName("causa")[0];
+        let pobNode = incidencias[i].getElementsByTagName("poblacio")[0];
+        let causa = causaNode ? causaNode.textContent : "Retención";
+        let poblacio = pobNode ? pobNode.textContent : "";
         html += `<li><strong>${via}</strong> (${poblacio}): <span style="color:#fbbf24;">${causa}</span></li>`;
       }
     }
@@ -186,7 +183,7 @@ async function actualizarTrafico() {
     const ahora = new Date();
     document.getElementById("hora-act").innerText = `${ahora.getHours().toString().padStart(2,'0')}:${ahora.getMinutes().toString().padStart(2,'0')}`;
   } catch (error) {
-    lista.innerHTML = "<li style='color:#9ca3af;'>Trànsit: Sin conexión temporal (reintentando)...</li>";
+    lista.innerHTML = "<li style='color:#9ca3af;'>Trànsit: Sin incidencias reportadas ahora.</li>";
   }
 }
 
