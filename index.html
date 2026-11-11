@@ -8,7 +8,6 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; width: 100%; height: 100%; font-family: system-ui, -apple-system, sans-serif; background-color: #111827; color: white; overflow: hidden; }
   
-  /* Barra superior con altura fija de 135px */
   #top-bar { width: 100%; height: 135px; display: flex; border-bottom: 3px solid #374151; }
   
   #alerta-box { flex: 1.2; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 10px 20px; text-align: center; transition: background-color 0.2s; border-right: 2px solid #374151; }
@@ -25,7 +24,6 @@
   #lista-incidencias { margin: 0; padding-left: 18px; font-size: 1rem; line-height: 1.35; }
   #lista-incidencias li { margin-bottom: 4px; }
 
-  /* El mapa ocupa exactamente el 100% del espacio restante */
   #map-container { width: 100%; height: calc(100vh - 135px); background-color: #1f2937; }
   iframe { width: 100%; height: 100%; border: 0; display: block; filter: invert(90%) hue-rotate(180deg) contrast(95%); }
 </style>
@@ -51,7 +49,6 @@
 </div>
 
 <div id="map-container">
-  <!-- Google Maps Tráfico en Directo centrado en Barberà / C-58 / AP-7 -->
   <iframe id="mapa-live" src="https://google.com"></iframe>
 </div>
 
@@ -93,11 +90,12 @@ if ("geolocation" in navigator) {
     const vel = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
     document.getElementById("gps-status").innerText = "GPS Activo | " + vel + " km/h";
 
-    // Solo recarga el mapa si te has movido más de 300 metros (para evitar parpadeos)
+    // Construcción segura de la URL usando el símbolo + en lugar de llaves
     if (calcularDistancia(lat, lon, ultimaLat, ultimaLon) > 300) {
       ultimaLat = lat;
       ultimaLon = lon;
-      document.getElementById("mapa-live").src = `https://google.com{lat},${lon}&t=m&z=14&layer=t&output=embed`;
+      const urlMapa = "https://google.com" + lat + "," + lon + "&t=m&z=14&layer=t&output=embed";
+      document.getElementById("mapa-live").src = urlMapa;
     }
 
     let radarCercano = null;
