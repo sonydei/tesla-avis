@@ -26,7 +26,7 @@
   #lista-incidencias { margin: 0; padding-left: 18px; font-size: 1rem; line-height: 1.35; }
   #lista-incidencias li { margin-bottom: 4px; }
 
-  #map { flex: 1; width: 100%; background-color: #1f2937; }
+  #map { flex: 1; width: 100%; height: 82vh; background-color: #1f2937; }
 </style>
 </head>
 <body>
@@ -52,7 +52,6 @@
 <div id="map"></div>
 
 <script>
-// 1. RADARES FIJOS VALLÈS - BARCELONA
 const radares = [
   { lat: 41.5161, lon: 2.1264, nombre: "C-58 Barberà / Badia", limite: "80 km/h" },
   { lat: 41.5312, lon: 2.1128, nombre: "C-58 Tramo Sabadell - Badia", limite: "80 km/h" },
@@ -69,15 +68,14 @@ const radares = [
   { lat: 41.4351, lon: 2.1482, nombre: "B-20 Ronda de Dalt", limite: "80 km/h" }
 ];
 
-// 2. INICIALIZAR MAPA (Centrado por defecto en Barberà / C-58 para verlo en PC)
+// Iniciar mapa centrado en Barberà del Vallès
 const map = L.map('map').setView([41.5150, 2.1260], 13);
 
-// Mapa base oscuro estilo Tesla
 L.tileLayer('https://{s}://{z}/{x}/{y}{r}.png', {
   attribution: '© OpenStreetMap'
 }).addTo(map);
 
-// Pintar los radares en el mapa como círculos rojos con radio de aviso
+// Pintar los radares en rojo
 radares.forEach(r => {
   L.circleMarker([r.lat, r.lon], {
     color: '#ef4444',
@@ -87,7 +85,7 @@ radares.forEach(r => {
   }).addTo(map).bindPopup(`<b>📸 Radar: ${r.nombre}</b><br>Límite: ${r.limite}`);
 });
 
-// Marcador azul para la posición del coche
+// Marcador azul del coche
 let cocheMarker = L.circleMarker([41.5150, 2.1260], {
   color: '#ffffff',
   fillColor: '#3b82f6',
@@ -96,7 +94,6 @@ let cocheMarker = L.circleMarker([41.5150, 2.1260], {
   weight: 3
 }).addTo(map);
 
-// 3. CÁLCULO DE DISTANCIA GPS
 function calcularDistancia(lat1, lon1, lat2, lon2) {
   const R = 6371e3;
   const p1 = lat1 * Math.PI/180;
@@ -108,7 +105,6 @@ function calcularDistancia(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-// 4. LECTURA CONTINUA DEL GPS (Si estás en el coche, mueve el mapa; en PC no da error)
 if ("geolocation" in navigator) {
   navigator.geolocation.watchPosition(function(pos) {
     const lat = pos.coords.latitude;
@@ -144,11 +140,10 @@ if ("geolocation" in navigator) {
       titulo.innerText = "CONDUCCIÓN NORMAL";
     }
   }, function(err) {
-    document.getElementById("gps-status").innerText = "PC sin GPS (Vista previa centrada en Vallès)";
+    document.getElementById("gps-status").innerText = "Vista Previa PC (Esperando GPS de coche)";
   }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
 }
 
-// 5. INCIDENCIAS DEL SERVEI CATALÀ DE TRÀNSIT (Código corregido)
 async function actualizarTrafico() {
   const lista = document.getElementById("lista-incidencias");
   const vias = ['C-58', 'AP-7', 'C-16', 'B-10', 'B-20', 'C-17', 'B-30', 'N-150'];
